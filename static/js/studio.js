@@ -2,110 +2,157 @@
   'use strict';
 
   const generateBtn = document.getElementById('generateBtn');
-  const formError   = document.getElementById('formError');
-  const emptyState  = document.getElementById('emptyState');
-  const result      = document.getElementById('result');
+  const formError = document.getElementById('formError');
+  const emptyState = document.getElementById('emptyState');
+  const result = document.getElementById('result');
+  const loadingState = document.getElementById('loadingState');
+  const captchaModal = document.getElementById('captchaModal');
+  const captchaCancel = document.getElementById('captchaCancel');
+  const regenBtn = document.getElementById('regenBtn');
+  const regenImgBtn = document.getElementById('regenImgBtn');
+  
+  let captchaWidgetId = null;
+  let currentConcept = null;
 
-  // ── Chip selection ──────────────────────────────────────────────
-  document.querySelectorAll('.chip-group').forEach(group => {
+  function escHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function setUI(state) {
+    emptyState && emptyState.classList.toggle('hidden', state !== 'empty');
+    result && result.classList.toggle('hidden', state !== 'result');
+    loadingState && loadingState.classList.toggle('hidden', state !== 'loading');
+  }
+
+  function setStage(stage) {
+    const loaderStage = document.getElementById('loaderStage');
+    if (loaderStage) loaderStage.textContent = stage;
+  }
+
+  function startLoader() {
+    const loader = document.getElementById('loader');
+    if (loader) loader.classList.remove('hidden');
+  }
+
+  function stopLoader() {
+    const loader = document.getElementById('loader');
+    if (loader) loader.classList.add('hidden');
+  }
+
+  function collectPrefs() {
+    return {
+      style: document.getElementById('style')?.value || '',
+      material: document.getElementById('material')?.value || '',
+      occasion: document.getElementById('occasion')?.value || '',
+      primary_color: document.getElementById('primary_color')?.value || '',
+      accent_color: document.getElementById('accent_color')?.value || '',
+      inspiration: document.getElementById('inspiration')?.value?.trim() || '',
+    };
+  }
+
+  function renderConcept(c) {
+    currentConcept = c;
+    result && result.classList.remove('hidden');
+    const resultName = document.getElementById('resultName');
+    const resultTagline = document.getElementById('resultTagline');
+    const resultDesc = document.getElementById('resultDesc');
+    const resultPrice = document.getElementById('resultPrice');
+    const resultAudience = document.getElementById('resultAudience');
+    const resultTags = document.getElementById('resultTags');
+    const materialsList = document.getElementById('materialsList');
+    const featuresList = document.getElementById('featuresList');
+    const soleText = document.getElementById('soleText');
+
+    if (resultName) resultName.textContent = c.name || '';
+    if (resultTagline) resultTagline.textContent = c.tagline || '';
+    if (resultDesc) resultDesc.textContent = c.description || '';
+    if (resultPrice) resultPrice.textContent = c.retail_price || '';
+    if (resultAudience) resultAudience.textContent = c.target_audience || '';
+    if (resultTags) resultTags.textContent = (c.style_tags || []).join(' · ');
+    if (materialsList) materialsList.innerHTML = (c.materials || []).map((m) => `<li>${escHtml(m)}</li>`).join('');
+    if (featuresList) featuresList.innerHTML = (c.features || []).map((f) => `<li>${escHtml(f)}</li>`).join('');
+    if (soleText) soleText.textContent = c.sole_type || '—';
+  }
+
+  function fetchImage(prompt) {
+    // Placeholder for image fetch logic
+    console.log('Fetching image for:', prompt);
+  }
+
+  document.querySelectorAll('.chip-group').forEach((group) => {
     const hiddenInput = document.getElementById(group.dataset.field);
-    group.querySelectorAll('.chip').forEach(chip => {
+    group.querySelectorAll('.chip').forEach((chip) => {
       chip.addEventListener('click', () => {
-        group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        group.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
         chip.classList.add('active');
         if (hiddenInput) hiddenInput.value = chip.dataset.value;
       });
     });
   });
 
-  // ── Color pickers ───────────────────────────────────────────────
   function syncColorPair(pickerId, textId) {
     const picker = document.getElementById(pickerId);
-    const text   = document.getElementById(textId);
+    const text = document.getElementById(textId);
     if (!picker || !text) return;
-    picker.addEventListener('input', () => { text.value = picker.value; });
+
+    picker.addEventListener('input', () => {
+      text.value = picker.value;
+    });
+
     text.addEventListener('input', () => {
-      if (/^#[0-9A-Fa-f]{6}$/.test(text.value)) picker.value = text.value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(text.value)) {
+        picker.value = text.value;
+      }
     });
   }
+
   syncColorPair('primary_color', 'primary_color_text');
-  syncColorPair('accent_color',  'accent_color_text');
+  syncColorPair('accent_color', 'accent_color_text');
 
-  // ── Generate button — UI only, no AI yet ────────────────────────
-  generateBtn && generateBtn.addEventListener('click', () => {
-    const style    = document.getElementById('style').value;
-    const material = document.getElementById('material').value;
-    const primary  = document.getElementById('primary_color').value;
-    const accent   = document.getElementById('accent_color').value;
+  // TODO 1
+  window.hcaptchaReady = () => {
+    captchaWidgetId = hcaptcha.render('hcaptchaWidget', {
+      sitekey: window.HCAPTCHA_SITE_KEY, theme: 'dark', size: 'compact',
+      callback: token => { captchaModal.classList.add('hidden'); runGeneration(token); },
+      'expired-callback': () => { captchaModal.classList.add('hidden'); generateBtn.disabled = false; formError.textContent = 'CAPTCHA expired.'; },
+    });
+  };
 
-    // Show a mock result to confirm the UI is working
-    emptyState && emptyState.classList.add('hidden');
-    if (result) {
-      result.classList.remove('hidden');
-      document.getElementById('resultName').textContent    = 'UI Interface Ready';
-      document.getElementById('resultTagline').textContent = `${style} · ${material} · ${primary} / ${accent}`;
-      document.getElementById('resultDesc').textContent    = 'Lesson 1 complete. The interface is structured and all inputs are wired up. Proceed to Lesson 2 to connect the AI.';
-      document.getElementById('resultPrice').textContent   = 'Lesson 1';
-      document.getElementById('resultAudience').textContent = 'Interface only';
-    }
+  // TODO 2
+  generateBtn?.addEventListener('click', () => {
     formError.textContent = '';
+    if (typeof hcaptcha === 'undefined' || captchaWidgetId === null) { formError.textContent = 'CAPTCHA not loaded. Refresh.'; return; }
+    hcaptcha.reset(captchaWidgetId);
+    captchaModal.classList.remove('hidden');
   });
 
-})();
+  // TODO 3
+  captchaCancel?.addEventListener('click', () => { captchaModal.classList.add('hidden'); hcaptcha?.reset(captchaWidgetId); });
 
-generateBtn && generateBtn.addEventListener('click', async () => {
-    formError.textContent = '';
+  // TODO 4
+  const runGeneration = async token => {
+    const prefs = collectPrefs();
     generateBtn.disabled = true;
-    emptyState  && emptyState.classList.add('hidden');
-    result      && result.classList.add('hidden');
-    loadingState && loadingState.classList.remove('hidden');
-
-    const prefs = {
-      style:         document.getElementById('style').value,
-      material:      document.getElementById('material').value,
-      occasion:      document.getElementById('occasion').value,
-      primary_color: document.getElementById('primary_color').value,
-      accent_color:  document.getElementById('accent_color').value,
-      inspiration:   document.getElementById('inspiration').value.trim(),
-    };
-
+    setUI('loading'); setStage('groq'); startLoader();
     try {
-      const resp = await fetch('/generate', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(prefs),
-      });
-      const data = await resp.json();
-
-      loadingState && loadingState.classList.add('hidden');
-
-      if (data.error) {
-        emptyState && emptyState.classList.remove('hidden');
-        formError.textContent = data.error;
-      } else {
-        const c = data.concept;
-        result && result.classList.remove('hidden');
-        document.getElementById('resultName').textContent     = c.name || '';
-        document.getElementById('resultTagline').textContent  = c.tagline || '';
-        document.getElementById('resultDesc').textContent     = c.description || '';
-        document.getElementById('resultPrice').textContent    = c.retail_price || '';
-        document.getElementById('resultAudience').textContent = c.target_audience || '';
-        document.getElementById('resultTags').textContent     = (c.style_tags || []).join(' · ');
-        document.getElementById('materialsList').innerHTML    = (c.materials || []).map(m => `<li>${escHtml(m)}</li>`).join('');
-        document.getElementById('featuresList').innerHTML     = (c.features  || []).map(f => `<li>${escHtml(f)}</li>`).join('');
-        document.getElementById('soleText').textContent       = c.sole_type || '—';
-      }
-    } catch (err) {
-      loadingState && loadingState.classList.add('hidden');
-      emptyState   && emptyState.classList.remove('hidden');
-      formError.textContent = 'Network error: ' + err.message;
+      const r = await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...prefs,'h-captcha-response':token})});
+      const d = await r.json();
+      if (!r.ok||d.error) throw new Error(d.error||'Server error');
+      stopLoader(); renderConcept(d.concept); setUI('result');
+      fetchImage(d.concept.image_prompt || `Premium ${prefs.style} sneaker, ${prefs.material}, studio photography, 8k`);
+    } catch(e) {
+      stopLoader(); setUI('empty'); formError.textContent = e.message||'Something went wrong.';
+    } finally {
+      generateBtn.disabled = false;
+      if (typeof hcaptcha!=='undefined' && captchaWidgetId!==null) hcaptcha.reset(captchaWidgetId);
     }
+  };
 
-    generateBtn.disabled = false;
-  });
-
-  document.getElementById('regenBtn') && document.getElementById('regenBtn').addEventListener('click', () => {
-    result     && result.classList.add('hidden');
-    emptyState && emptyState.classList.remove('hidden');
-    formError.textContent = '';
-  });
+  regenImgBtn?.addEventListener('click', () => currentConcept && fetchImage(currentConcept.image_prompt||`Premium sneaker, ${currentConcept.name||'sneaker'}, studio, 8k`));
+  regenBtn?.addEventListener('click', () => { formError.textContent=''; setUI('empty'); currentConcept=null; document.querySelector('.form-panel')?.scrollIntoView({behavior:'smooth'}); });
+})();
