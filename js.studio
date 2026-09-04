@@ -41,3 +41,44 @@ const runGeneration = async token => {
 
   regenImgBtn?.addEventListener('click', () => currentConcept && fetchImage(currentConcept.image_prompt||`Premium sneaker, ${currentConcept.name||'sneaker'}, studio, 8k`));
   regenBtn?.addEventListener('click', () => { formError.textContent=''; setUI('empty'); currentConcept=null; document.querySelector('.form-panel')?.scrollIntoView({behavior:'smooth'}); });
+
+  // TODO 1
+const showImgLoading = () => { imgLoading?.classList.remove('hidden'); imgFrame?.classList.add('hidden'); imgError?.classList.add('hidden'); regenImgBtn?.classList.add('hidden'); };
+
+// TODO 2
+  const showImgResult  = url => { imgLoading?.classList.add('hidden'); imgError?.classList.add('hidden'); if(aiImage) aiImage.src=url; imgFrame?.classList.remove('hidden'); regenImgBtn?.classList.remove('hidden'); };
+
+// TODO 3
+  const showImgError   = msg => { imgLoading?.classList.add('hidden'); imgFrame?.classList.add('hidden'); if(imgErrorText) imgErrorText.textContent=msg||'Image generation failed.'; imgError?.classList.remove('hidden'); regenImgBtn?.classList.remove('hidden'); };
+
+
+// TODO 4
+const fetchImage = async prompt => {
+    setStage('hf'); showImgLoading();
+    try {
+      const r = await fetch('/generate-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_prompt:prompt})});
+      const d = await r.json();
+      if (!r.ok||d.error) throw new Error(d.error||'Image generation failed');
+      showImgResult(d.image_url);
+    } catch(e) { showImgError(e.message); }
+  };
+
+
+// TODO 5
+const runGeneration = async token => {
+    const prefs = collectPrefs();
+    generateBtn.disabled = true;
+    setUI('loading'); setStage('groq'); startLoader();
+    try {
+      const r = await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...prefs,'h-captcha-response':token})});
+      const d = await r.json();
+      if (!r.ok||d.error) throw new Error(d.error||'Server error');
+      stopLoader(); renderConcept(d.concept); setUI('result');
+      fetchImage(d.concept.image_prompt || `Premium ${prefs.style} sneaker, ${prefs.material}, studio photography, 8k`);
+    } catch(e) {
+      stopLoader(); setUI('empty'); formError.textContent = e.message||'Something went wrong.';
+    } finally {
+      generateBtn.disabled = false;
+      if (typeof hcaptcha!=='undefined' && captchaWidgetId!==null) hcaptcha.reset(captchaWidgetId);
+    }
+  };
