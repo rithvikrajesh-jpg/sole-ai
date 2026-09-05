@@ -142,3 +142,13 @@ def generate_image():
     if not image_url:
         return jsonify({"error": "Image generation failed. Try again."}), 500
     return jsonify({"success": True, "image_url": image_url})
+
+def build_image_prompt(prefs): 
+    p = hex_to_color_name(prefs["primary_color"])
+    a = hex_to_color_name(prefs["accent_color"])
+    prompt = (f"Professional product photography of a {prefs['style']} sneaker, "
+              f"{p} {prefs['material']} upper, {a} accent, {a} heel, white sole, "
+              f"side view, white background, sharp focus, 8k, shoe only")
+    if prefs.get("inspiration"):
+        prompt += f", {prefs['inspiration']} theme"
+    return prompt    

@@ -82,3 +82,15 @@ const runGeneration = async token => {
       if (typeof hcaptcha!=='undefined' && captchaWidgetId!==null) hcaptcha.reset(captchaWidgetId);
     }
   };
+const.applycolorway = (cw, el) => {
+  const svg = el.querySelector('.sneaker.svg') || el:
+  [['-- upper-color', cw.upper],['--panel-color', cw sole], ["--toe-color", cw.upper],
+  ['--accent-color', cw.accent],["--lace-color", cw.lace],["--midsle-color", cw.tongue]
+], forEach(([p,v])) => svg.style.setproperty(p,v[] '')); 
+}:
+
+const.selectcolorway = idx => {
+   colorwaytabs.querySelectorAll('.cw.tab').forEach((t,i)) => t.classList.toggle("active", i===idx)};
+   applycolorway(currentcolorways{idx}, sneakerstage);
+   colorwayinfo.innerhtml = [['upper', currentcolorways[idx],upper ],]
+};
